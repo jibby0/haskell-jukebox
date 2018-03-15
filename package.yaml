@@ -1,0 +1,57 @@
+name:                haskell-jukebox
+version:             0.1.0.0
+github:              "josh1147582/haskell-jukebox"
+license:             BSD3
+author:              "Josh Bicking"
+maintainer:          "joshbicking@comcast.net"
+copyright:           "GPL3"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/josh1147582/haskell-jukebox#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- scotty
+- wai-extra
+- blaze-html
+- random
+- process
+- bytestring
+- network
+
+library:
+  source-dirs: src
+  dependencies:
+  - process
+
+executables:
+  haskell-jukebox-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - haskell-jukebox
+
+tests:
+  haskell-jukebox-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - haskell-jukebox
