@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Main where
 
 import Lib
@@ -25,32 +27,75 @@ import Network.Socket.ByteString(send, recv)
 
 import Data.ByteString(breakSubstring)
 
+import Data.Aeson
+import GHC.Generics
+import Data.Text
+import qualified Data.Vector as V
+
+import qualified Data.ByteString.Lazy as DBSL
+import qualified Data.ByteString as DBS
+
+data Command = Command
+  { command :: Array
+  } deriving (Generic, Show)
+
+instance ToJSON Command where
+    toJSON (Command command) =
+        object ["command" .= command]
+
+    -- this encodes directly to a bytestring Builder
+    toEncoding (Command command) =
+        pairs ("command" .= command)
+
+mpvSocket :: String
+mpvSocket = "/tmp/haskell-jukebox-mpv-socket"
+
 main :: IO ()
 main = do
-  num <- (randomIO :: IO Integer)
-  let socket = "/tmp/mpvsocket" ++ (show num)
-    in do
-    putStrLn ("MPV listening at " ++ socket)
-    (_, _, _, p) <- createProcess (proc "mpv" ["--input-ipc-server=" ++ socket, "/home/josh/'IS THAT A MAN RIDING A SHRIMP'-9p_QW_HsKPI.mp3"]){ std_in = NoStream, std_out = NoStream, std_err = NoStream}
-    threadDelay 2000000
-    togglePause socket
-    threadDelay 2000000
-    togglePause socket
-    waitForProcess p
-    return ()
+  putStrLn ("MPV listening at " ++ mpvSocket)
+  (_, _, _, p) <- createProcess (proc "mpv"
+                                  [ "--input-ipc-server=" ++ mpvSocket
+                                  , "/home/josh/shrimp.mp3"
+                                  ]) { std_in = NoStream
+                                     , std_out = NoStream
+                                     , std_err = NoStream}
+  threadDelay 2000000
+  putStrLn "sending pause"
+  togglePause
+  threadDelay 2000000
+  putStrLn "sending pause"
+  togglePause
+  waitForProcess p
+  return ()
 
-togglePause :: String -> IO ()
-togglePause ipcloc = do
+togglePause :: IO ()
+togglePause = do
+  received <- sendToMPV Command { command = V.fromList
+                                  [ "get_property"
+                                  , "pause"
+                                  ]}
+  sendToMPV Command { command = V.fromList
+                      [ "set_property"
+                      , "pause"
+                      , case snd $ breakSubstring "true" received of
+                         "" -> Bool True
+                         otherwise -> Bool False
+                      ]}
+  return ()
+
+sendToMPV :: Command -> IO DBS.ByteString
+sendToMPV c = do
+  putStrLn ("Connected to Socket: " ++ mpvSocket)
   soc <- socket AF_UNIX Stream 0
-  connect soc (SockAddrUnix ipcloc)
-  send soc "{ \"command\": [\"get_property\", \"pause\"] }\n"
+  connect soc (SockAddrUnix mpvSocket)
+  send soc toSend
+  putStrLn "Sending: "
+  print toSend
   received <- recv soc 4096
-  putStrLn ("Recieved from MPV: " ++ (show received))
-  send soc $
-    case snd $ breakSubstring "true" received of
-      "" -> "{ \"command\": [\"set_property\", \"pause\", true] }\n"
-      otherwise -> "{ \"command\": [\"set_property\", \"pause\", false] }\n"
+  putStrLn ("Received from MPV: " ++ (show received))
   close soc
+  return received
+  where toSend = (DBSL.toStrict ((encode (c)) `DBSL.append` "\n"))
 
 oldmain :: IO ()
 oldmain = scotty 3000 $ do

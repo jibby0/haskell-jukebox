@@ -28,6 +28,9 @@ dependencies:
 - process
 - bytestring
 - network
+- text
+- aeson
+- vector
 
 library:
   source-dirs: src
